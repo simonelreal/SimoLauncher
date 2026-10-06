@@ -13,6 +13,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -25,6 +26,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.DragEvent
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
@@ -75,6 +77,11 @@ class MainActivity : Activity() {
     private var lastEdgeSwitch = 0L
     private var dragMenuItem: Item? = null
     private var pendingWidget = -1
+    private var dragActive = false
+    private var gx = 0f
+    private var gy = 0f
+    private var gT = 0L
+    private var gValid = false
 
     private val pkgReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
@@ -126,9 +133,60 @@ class MainActivity : Activity() {
         super.onResume()
         if (cfg.rev != lastRev) {
             lastRev = cfg.rev
+            items = Store.load(cfg)
+            if (!cfg.sp.getBoolean("seeded", false)) {
+                seedDock()
+                cfg.sp.edit().putBoolean("seeded", true).apply()
+            }
             icons.reload()
             renderAll()
             if (drawer.visibility == View.VISIBLE) refreshDrawer()
+        }
+    }
+
+    // Gesti di scorrimento: funzionano OVUNQUE nella schermata, anche partendo da un'icona
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                gx = ev.rawX; gy = ev.rawY; gT = ev.eventTime
+                gValid = !dragActive && !onWidget(ev.rawX, ev.rawY)
+            }
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> gValid = false
+            MotionEvent.ACTION_UP -> {
+                if (gValid) handleSwipe(ev.rawX - gx, ev.rawY - gy, ev.eventTime - gT)
+                gValid = false
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun onWidget(x: Float, y: Float): Boolean {
+        val r = Rect()
+        for (i in items) {
+            if (i.type != Item.WIDGET) continue
+            val v = viewOf[i.id] ?: continue
+            if (v.getGlobalVisibleRect(r) && r.contains(x.toInt(), y.toInt())) return true
+        }
+        return false
+    }
+
+    private fun handleSwipe(dx: Float, dy: Float, dt: Long) {
+        val d = resources.displayMetrics.density
+        if (Math.abs(dy) < cfg.swipeDist * d || Math.abs(dy) < Math.abs(dx) * 1.5f || dt > 800) return
+        if (drawer.visibility == View.VISIBLE) {
+            if (dy > 0 && !drawerGrid.canScrollVertically(-1)) closeDrawer()
+            return
+        }
+        runAction(if (dy < 0) cfg.gSwipeUp else cfg.gSwipeDown)
+    }
+
+    private fun runAction(code: String) {
+        when (code) {
+            "drawer" -> openDrawer()
+            "notif" -> expandPanel()
+            "lock" -> lockScreen()
+            "settings" -> openSettings()
+            "menu" -> emptyMenu()
         }
     }
 
@@ -242,6 +300,7 @@ class MainActivity : Activity() {
                     (e.localState as? Item)?.let { removeItem(it) }
                 }
                 DragEvent.ACTION_DRAG_ENDED -> {
+                    dragActive = false
                     removeZone.visibility = View.GONE
                     renderAll()
                     val m = dragMenuItem
@@ -257,12 +316,19 @@ class MainActivity : Activity() {
     }
 
     private fun wire(cl: CellLayout) {
-        cl.cbSwipeUp = { openDrawer() }
-        cl.cbSwipeDown = { expandPanel() }
-        cl.cbDouble = { doubleTap() }
-        cl.cbPinch = { openSettings() }
+        cl.cbDouble = { runAction(cfg.gDouble) }
+        cl.cbPinch = { runAction(cfg.gPinch) }
         cl.cbLong = { emptyMenu() }
         cl.setOnDragListener { v, e -> onDrag(v as CellLayout, e) }
+    }
+
+    // Applica le impostazioni visive (sfondo scuro, dock, indicatore pagine, cassetto)
+    private fun applyCfg() {
+        root.setBackgroundColor((cfg.dim * 255 / 100) shl 24)
+        dots.visibility = if (cfg.showDots) View.VISIBLE else View.GONE
+        dockLayout.visibility = if (cfg.showDock) View.VISIBLE else View.GONE
+        dockLayout.background = round(((cfg.dockOpacity * 255 / 100) shl 24) or 0xFFFFFF)
+        drawer.setBackgroundColor(((cfg.drawerOpacity * 255 / 100) shl 24) or 0x101014)
     }
 
     private fun buildDots(n: Int) {
@@ -371,6 +437,7 @@ class MainActivity : Activity() {
     // ------------------------------------------------------------ disegno home
     private fun renderAll() {
         if (scroller.width == 0) { scroller.post { renderAll() }; return }
+        applyCfg()
         normalize()
         val maxPage = items.maxOfOrNull { it.page } ?: 0
         val n = maxOf(1, cfg.pages, maxPage + 1)
@@ -406,7 +473,7 @@ class MainActivity : Activity() {
 
     private fun buildAppView(i: Item): View? {
         val label = labelOf[i.key] ?: return null
-        val c = makeCell(this, icons.px, cfg.labels)
+        val c = makeCell(this, icons.px, cfg.labels, cfg.labelSize.toFloat())
         icons.load(i.key, c.getChildAt(0) as ImageView)
         (c.getChildAt(1) as TextView).text = label
         c.setOnClickListener { launch(i.key) }
@@ -434,7 +501,7 @@ class MainActivity : Activity() {
             }
             box.addView(row)
         }
-        val c = makeCell(this, s, cfg.labels)
+        val c = makeCell(this, s, cfg.labels, cfg.labelSize.toFloat())
         c.removeViewAt(0)
         c.addView(box, 0, LinearLayout.LayoutParams(s, s))
         (c.getChildAt(1) as TextView).text = i.title
@@ -484,8 +551,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun doubleTap() {
-        if (!cfg.dtLock) return
+    private fun lockScreen() {
         val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         val admin = ComponentName(this, LockAdmin::class.java)
         if (dpm.isAdminActive(admin)) dpm.lockNow()
@@ -503,9 +569,13 @@ class MainActivity : Activity() {
     // ------------------------------------------------------------ cassetto
     private fun refreshDrawer() {
         val q = search.text.toString().trim().lowercase()
-        shown = if (q.isEmpty()) apps.map { it.key } else apps.filter { it.label.lowercase().contains(q) }.map { it.key }
+        val hid = cfg.hidden
+        val visible = apps.filter { !hid.contains(it.key) }
+        shown = if (q.isEmpty()) visible.map { it.key } else visible.filter { it.label.lowercase().contains(q) }.map { it.key }
         drawerGrid.numColumns = cfg.drawerCols
-        drawerGrid.adapter = AppGridAdapter(this, shown, labelOf, icons, cfg.labels)
+        drawerGrid.adapter = AppGridAdapter(
+            this, shown, labelOf, icons, icons.pxFor(cfg.drawerIconScale), cfg.drawerLabels, cfg.labelSize.toFloat()
+        )
     }
 
     private fun openDrawer() {
@@ -515,6 +585,10 @@ class MainActivity : Activity() {
         drawer.visibility = View.VISIBLE
         drawer.translationY = root.height.toFloat()
         drawer.animate().translationY(0f).setDuration(180).start()
+        if (cfg.drawerKeyboard) {
+            search.requestFocus()
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(search, 0)
+        }
     }
 
     private fun closeDrawer() {
@@ -552,6 +626,8 @@ class MainActivity : Activity() {
 
     // ------------------------------------------------------------ trascinamento
     private fun startDrag(v: View, item: Item) {
+        if (cfg.lockLayout) { toast("Layout bloccato (si sblocca dalle impostazioni)"); return }
+        dragActive = true
         removeZone.visibility = View.VISIBLE
         v.startDragAndDrop(ClipData.newPlainText("item", item.id.toString()), View.DragShadowBuilder(v), item, 0)
         v.visibility = View.INVISIBLE
@@ -654,7 +730,7 @@ class MainActivity : Activity() {
         val g = GridView(this)
         g.numColumns = 3
         g.setPadding(dp(8), dp(8), dp(8), dp(8))
-        g.adapter = AppGridAdapter(this, keys, labelOf, icons, true)
+        g.adapter = AppGridAdapter(this, keys, labelOf, icons, icons.px, true, cfg.labelSize.toFloat())
         val dlg = AlertDialog.Builder(this).setTitle(item.title).setView(g)
             .setNeutralButton("Rinomina") { _, _ -> rename(item) }.create()
         g.setOnItemClickListener { _, _, pos, _ -> dlg.dismiss(); launch(keys[pos]) }

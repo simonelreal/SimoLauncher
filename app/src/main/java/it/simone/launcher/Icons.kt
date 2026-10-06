@@ -27,8 +27,11 @@ class Icons(private val ctx: Context, private val cfg: Cfg) {
     @Volatile private var packPkg: String? = null
     @Volatile private var map: HashMap<String, String> = HashMap()
 
+    fun pxFor(percent: Int): Int =
+        (46 * ctx.resources.displayMetrics.density * percent / 100f).toInt().coerceAtLeast(16)
+
     val px: Int
-        get() = (46 * ctx.resources.displayMetrics.density * cfg.iconScale / 100f).toInt().coerceAtLeast(16)
+        get() = pxFor(cfg.iconScale)
 
     fun reload() {
         cache.evictAll()

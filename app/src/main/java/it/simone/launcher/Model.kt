@@ -15,7 +15,24 @@ class Cfg(ctx: Context) {
     var drawerCols: Int get() = sp.getInt("drawerCols", 4); set(v) { sp.edit().putInt("drawerCols", v).apply() }
     var pages: Int get() = sp.getInt("pages", 1); set(v) { sp.edit().putInt("pages", v).apply() }
     var labels: Boolean get() = sp.getBoolean("labels", true); set(v) { sp.edit().putBoolean("labels", v).apply() }
-    var dtLock: Boolean get() = sp.getBoolean("dtLock", false); set(v) { sp.edit().putBoolean("dtLock", v).apply() }
+    var labelSize: Int get() = sp.getInt("labelSize", 11); set(v) { sp.edit().putInt("labelSize", v).apply() }
+    var dim: Int get() = sp.getInt("dim", 0); set(v) { sp.edit().putInt("dim", v).apply() }
+    var showDots: Boolean get() = sp.getBoolean("showDots", true); set(v) { sp.edit().putBoolean("showDots", v).apply() }
+    var showDock: Boolean get() = sp.getBoolean("showDock", true); set(v) { sp.edit().putBoolean("showDock", v).apply() }
+    var dockOpacity: Int get() = sp.getInt("dockOpacity", 20); set(v) { sp.edit().putInt("dockOpacity", v).apply() }
+    var drawerIconScale: Int get() = sp.getInt("drawerIconScale", 100); set(v) { sp.edit().putInt("drawerIconScale", v).apply() }
+    var drawerLabels: Boolean get() = sp.getBoolean("drawerLabels", true); set(v) { sp.edit().putBoolean("drawerLabels", v).apply() }
+    var drawerOpacity: Int get() = sp.getInt("drawerOpacity", 94); set(v) { sp.edit().putInt("drawerOpacity", v).apply() }
+    var drawerKeyboard: Boolean get() = sp.getBoolean("drawerKeyboard", false); set(v) { sp.edit().putBoolean("drawerKeyboard", v).apply() }
+    var swipeDist: Int get() = sp.getInt("swipeDist", 80); set(v) { sp.edit().putInt("swipeDist", v).apply() }
+    var lockLayout: Boolean get() = sp.getBoolean("lockLayout", false); set(v) { sp.edit().putBoolean("lockLayout", v).apply() }
+    var gSwipeUp: String get() = sp.getString("gSwipeUp", "drawer") ?: "drawer"; set(v) { sp.edit().putString("gSwipeUp", v).apply() }
+    var gSwipeDown: String get() = sp.getString("gSwipeDown", "notif") ?: "notif"; set(v) { sp.edit().putString("gSwipeDown", v).apply() }
+    var gDouble: String get() = sp.getString("gDouble", "none") ?: "none"; set(v) { sp.edit().putString("gDouble", v).apply() }
+    var gPinch: String get() = sp.getString("gPinch", "settings") ?: "settings"; set(v) { sp.edit().putString("gPinch", v).apply() }
+    var hidden: Set<String>
+        get() = sp.getStringSet("hidden", emptySet()) ?: emptySet()
+        set(v) { sp.edit().putStringSet("hidden", HashSet(v)).apply() }
     var iconPack: String?
         get() = sp.getString("iconPack", null)
         set(v) { if (v == null) sp.edit().remove("iconPack").apply() else sp.edit().putString("iconPack", v).apply() }

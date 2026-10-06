@@ -13,7 +13,7 @@ import android.widget.TextView
 
 fun Context.dp(v: Int): Int = (v * resources.displayMetrics.density + 0.5f).toInt()
 
-fun makeCell(ctx: Context, iconPx: Int, showLabel: Boolean): LinearLayout {
+fun makeCell(ctx: Context, iconPx: Int, showLabel: Boolean, textSp: Float = 11f): LinearLayout {
     val l = LinearLayout(ctx)
     l.orientation = LinearLayout.VERTICAL
     l.gravity = Gravity.CENTER
@@ -21,7 +21,7 @@ fun makeCell(ctx: Context, iconPx: Int, showLabel: Boolean): LinearLayout {
     l.addView(ImageView(ctx), LinearLayout.LayoutParams(iconPx, iconPx))
     val tv = TextView(ctx)
     tv.setTextColor(Color.WHITE)
-    tv.textSize = 11f
+    tv.textSize = textSp
     tv.maxLines = 1
     tv.ellipsize = TextUtils.TruncateAt.END
     tv.gravity = Gravity.CENTER
@@ -38,15 +38,17 @@ class AppGridAdapter(
     private val keys: List<String>,
     private val labels: Map<String, String>,
     private val icons: Icons,
-    private val showLabels: Boolean
+    private val iconPx: Int,
+    private val showLabels: Boolean,
+    private val textSp: Float
 ) : BaseAdapter() {
     override fun getCount() = keys.size
     override fun getItem(p: Int): Any = keys[p]
     override fun getItemId(p: Int) = p.toLong()
     override fun getView(p: Int, v: View?, parent: ViewGroup?): View {
-        val l = (v as? LinearLayout) ?: makeCell(ctx, icons.px, showLabels)
+        val l = (v as? LinearLayout) ?: makeCell(ctx, iconPx, showLabels, textSp)
         val key = keys[p]
-        icons.load(key, l.getChildAt(0) as ImageView)
+        icons.load(key, l.getChildAt(0) as ImageView, iconPx)
         (l.getChildAt(1) as TextView).text = labels[key] ?: ""
         return l
     }

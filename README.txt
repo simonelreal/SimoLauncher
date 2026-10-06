@@ -13,7 +13,8 @@ Uso:
 
 --- VERSIONE 2 (stile Nova, leggera) ---
 Gesti sulla home (zona vuota):
-- Swipe su: cassetto app | Swipe giu: tendina notifiche
+- Swipe su (ovunque nella home): cassetto app | Swipe giu: tendina notifiche
+  (tutti i gesti si cambiano in Impostazioni > Gesti)
 - Doppio tap: blocca schermo (da attivare nelle impostazioni)
 - Pizzico: impostazioni | Tocco lungo su zona vuota: widget, pagine, sfondo
 Icone: tocco lungo = trascina. Rilascia senza spostare = menu.
